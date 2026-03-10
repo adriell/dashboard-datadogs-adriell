@@ -1,0 +1,556 @@
+{
+  "title": "Plataforma Desafiar — Radar de Saúde",
+  "description": "Dashboard executivo para gestores. Mostra uptime do ITOKEN, dispositivos, squads e incidentes. Atualizado automaticamente.",
+  "layout_type": "ordered",
+  "reflow_type": "fixed",
+  "tags": ["team:plataforma-desafiar", "env:production", "tipo:executivo"],
+  "template_variables": [
+    {
+      "name": "env",
+      "prefix": "env",
+      "available_values": ["production", "staging"],
+      "default": "production"
+    },
+    {
+      "name": "squad",
+      "prefix": "squad",
+      "available_values": [],
+      "default": "*"
+    }
+  ],
+  "widgets": [
+
+    {
+      "definition": {
+        "type": "group",
+        "layout_type": "ordered",
+        "title": "🔒 Camada Zero — ITOKEN",
+        "background_color": "vivid_blue",
+        "widgets": [
+
+          {
+            "definition": {
+              "type": "service_level_objective",
+              "title": "SLO — Disponibilidade ITOKEN",
+              "title_size": "16",
+              "title_align": "left",
+              "view_type": "detail",
+              "slo_id": "SUBSTITUA_PELO_ID_DO_SEU_SLO",
+              "show_error_budget": true,
+              "view_mode": "overall",
+              "time_windows": ["7d", "30d", "90d"],
+              "global_time_target": "99.9"
+            },
+            "layout": { "x": 0, "y": 0, "width": 4, "height": 3 }
+          },
+
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Latência ITOKEN — p50 / p95 / p99",
+              "title_size": "13",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "formulas": [{ "formula": "query1", "alias": "p50" }],
+                  "queries": [{
+                    "name": "query1",
+                    "data_source": "metrics",
+                    "query": "p50:trace.itoken.validation.duration{env:$env} by {service}"
+                  }],
+                  "response_format": "timeseries",
+                  "style": { "palette": "blue", "line_type": "solid", "line_width": "normal" }
+                },
+                {
+                  "formulas": [{ "formula": "query2", "alias": "p95" }],
+                  "queries": [{
+                    "name": "query2",
+                    "data_source": "metrics",
+                    "query": "p95:trace.itoken.validation.duration{env:$env} by {service}"
+                  }],
+                  "response_format": "timeseries",
+                  "style": { "palette": "orange", "line_type": "solid", "line_width": "normal" }
+                },
+                {
+                  "formulas": [{ "formula": "query3", "alias": "p99" }],
+                  "queries": [{
+                    "name": "query3",
+                    "data_source": "metrics",
+                    "query": "p99:trace.itoken.validation.duration{env:$env} by {service}"
+                  }],
+                  "response_format": "timeseries",
+                  "style": { "palette": "red", "line_type": "dashed", "line_width": "thin" }
+                }
+              ],
+              "yaxis": { "include_zero": true, "scale": "linear" },
+              "markers": [
+                { "value": "y = 500", "display_type": "warning dashed", "label": "SLA 500ms" },
+                { "value": "y = 1000", "display_type": "error dashed", "label": "Limite crítico 1s" }
+              ]
+            },
+            "layout": { "x": 4, "y": 0, "width": 8, "height": 3 }
+          },
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Taxa de Erro ITOKEN (últimas 24h)",
+              "title_size": "13",
+              "title_align": "left",
+              "autoscale": false,
+              "precision": 2,
+              "requests": [{
+                "formulas": [{ "formula": "(errors / total) * 100", "alias": "% erro" }],
+                "queries": [
+                  { "name": "errors", "data_source": "metrics", "query": "sum:itoken.validation.errors{env:$env}.as_count()", "aggregator": "sum" },
+                  { "name": "total", "data_source": "metrics", "query": "sum:itoken.validation.requests{env:$env}.as_count()", "aggregator": "sum" }
+                ],
+                "response_format": "scalar",
+                "conditional_formats": [
+                  { "comparator": ">", "value": 1, "palette": "white_on_red" },
+                  { "comparator": ">", "value": 0.1, "palette": "white_on_yellow" },
+                  { "comparator": "<=", "value": 0.1, "palette": "white_on_green" }
+                ]
+              }],
+              "suffix": "%"
+            },
+            "layout": { "x": 0, "y": 3, "width": 2, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Validações ITOKEN (hoje)",
+              "title_size": "13",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [{
+                "formulas": [{ "formula": "query1" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "sum:itoken.validation.requests{env:$env}.as_count()",
+                  "aggregator": "sum"
+                }],
+                "response_format": "scalar"
+              }],
+              "timeseries_background": { "type": "bars", "yaxis": { "include_zero": true } }
+            },
+            "layout": { "x": 2, "y": 3, "width": 2, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Volume de Validações ITOKEN — últimos 30 dias",
+              "title_size": "13",
+              "requests": [{
+                "formulas": [
+                  { "formula": "success", "alias": "Sucesso" },
+                  { "formula": "errors", "alias": "Erros" }
+                ],
+                "queries": [
+                  { "name": "success", "data_source": "metrics", "query": "sum:itoken.validation.success{env:$env}.as_count()" },
+                  { "name": "errors", "data_source": "metrics", "query": "sum:itoken.validation.errors{env:$env}.as_count()" }
+                ],
+                "response_format": "timeseries",
+                "display_type": "bars",
+                "style": { "palette": "green" }
+              }],
+              "show_legend": true
+            },
+            "layout": { "x": 4, "y": 3, "width": 8, "height": 2 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 1 }
+    },
+
+    {
+      "definition": {
+        "type": "group",
+        "layout_type": "ordered",
+        "title": "📱 Dispositivos — Validação & Habilitação",
+        "background_color": "vivid_purple",
+        "widgets": [
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Validados (este mês)",
+              "title_size": "13",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [{
+                "formulas": [{ "formula": "query1" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "sum:plataforma.device.validated{env:$env,squad:$squad}.as_count()",
+                  "aggregator": "sum"
+                }],
+                "response_format": "scalar",
+                "conditional_formats": [{ "comparator": ">", "value": 0, "palette": "white_on_green" }]
+              }]
+            },
+            "layout": { "x": 0, "y": 0, "width": 2, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Habilitados (este mês)",
+              "title_size": "13",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [{
+                "formulas": [{ "formula": "query1" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "sum:plataforma.device.enabled{env:$env,squad:$squad}.as_count()",
+                  "aggregator": "sum"
+                }],
+                "response_format": "scalar",
+                "conditional_formats": [{ "comparator": ">", "value": 0, "palette": "white_on_green" }]
+              }]
+            },
+            "layout": { "x": 2, "y": 0, "width": 2, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Bloqueados agora",
+              "title_size": "13",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [{
+                "formulas": [{ "formula": "query1" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "sum:plataforma.device.blocked{env:$env,squad:$squad}",
+                  "aggregator": "last"
+                }],
+                "response_format": "scalar",
+                "conditional_formats": [
+                  { "comparator": ">", "value": 5, "palette": "white_on_red" },
+                  { "comparator": ">", "value": 0, "palette": "white_on_yellow" },
+                  { "comparator": "<=", "value": 0, "palette": "white_on_green" }
+                ]
+              }]
+            },
+            "layout": { "x": 4, "y": 0, "width": 2, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Tempo Médio Unblocking (p50)",
+              "title_size": "13",
+              "autoscale": false,
+              "precision": 0,
+              "requests": [{
+                "formulas": [{ "formula": "query1 / 60000", "alias": "minutos" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "p50:plataforma.device.unblocking_duration_ms{env:$env,squad:$squad}",
+                  "aggregator": "avg"
+                }],
+                "response_format": "scalar",
+                "conditional_formats": [
+                  { "comparator": ">", "value": 60, "palette": "white_on_red" },
+                  { "comparator": ">", "value": 30, "palette": "white_on_yellow" },
+                  { "comparator": "<=", "value": 30, "palette": "white_on_green" }
+                ]
+              }],
+              "suffix": " min"
+            },
+            "layout": { "x": 6, "y": 0, "width": 3, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "change",
+              "title": "Variação de Dispositivos vs mês anterior",
+              "title_size": "13",
+              "requests": [{
+                "formulas": [{ "formula": "query1" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "sum:plataforma.device.enabled{env:$env,squad:$squad}.as_count()",
+                  "aggregator": "sum"
+                }],
+                "response_format": "scalar",
+                "change_type": "absolute",
+                "compare_to": "month_before",
+                "increase_good": true,
+                "order_by": "change",
+                "order_dir": "desc",
+                "show_present": true
+              }]
+            },
+            "layout": { "x": 9, "y": 0, "width": 3, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Dispositivos por Status — linha do tempo",
+              "title_size": "13",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "formulas": [{ "formula": "query1", "alias": "Validados" }],
+                  "queries": [{ "name": "query1", "data_source": "metrics", "query": "sum:plataforma.device.validated{env:$env,squad:$squad}.as_count().rollup(sum, 86400)" }],
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "style": { "palette": "purple" }
+                },
+                {
+                  "formulas": [{ "formula": "query2", "alias": "Habilitados" }],
+                  "queries": [{ "name": "query2", "data_source": "metrics", "query": "sum:plataforma.device.enabled{env:$env,squad:$squad}.as_count().rollup(sum, 86400)" }],
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "style": { "palette": "green" }
+                },
+                {
+                  "formulas": [{ "formula": "query3", "alias": "Bloqueados" }],
+                  "queries": [{ "name": "query3", "data_source": "metrics", "query": "sum:plataforma.device.blocked{env:$env,squad:$squad}.as_count().rollup(sum, 86400)" }],
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "style": { "palette": "red" }
+                }
+              ]
+            },
+            "layout": { "x": 0, "y": 2, "width": 12, "height": 3 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 1, "width": 12, "height": 1 }
+    },
+
+    {
+      "definition": {
+        "type": "group",
+        "layout_type": "ordered",
+        "title": "🤝 Squads — Suporte & Unblocking",
+        "background_color": "vivid_green",
+        "widgets": [
+
+          {
+            "definition": {
+              "type": "toplist",
+              "title": "Squads com mais solicitações (este mês)",
+              "title_size": "13",
+              "requests": [{
+                "formulas": [{ "formula": "query1", "alias": "Solicitações", "limit": { "count": 10, "order": "desc" } }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "sum:plataforma.squad.requests{env:$env}.as_count() by {squad}",
+                  "aggregator": "sum"
+                }],
+                "response_format": "scalar",
+                "style": { "palette": "datadog16" }
+              }]
+            },
+            "layout": { "x": 0, "y": 0, "width": 4, "height": 3 }
+          },
+
+          {
+            "definition": {
+              "type": "toplist",
+              "title": "Squads com maior tempo de unblocking (p95)",
+              "title_size": "13",
+              "requests": [{
+                "formulas": [{ "formula": "query1 / 60000", "alias": "minutos (p95)", "limit": { "count": 10, "order": "desc" } }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "p95:plataforma.device.unblocking_duration_ms{env:$env} by {squad}",
+                  "aggregator": "percentile"
+                }],
+                "response_format": "scalar",
+                "conditional_formats": [
+                  { "comparator": ">", "value": 60, "palette": "white_on_red" },
+                  { "comparator": ">", "value": 30, "palette": "white_on_yellow" },
+                  { "comparator": "<=", "value": 30, "palette": "white_on_green" }
+                ]
+              }]
+            },
+            "layout": { "x": 4, "y": 0, "width": 4, "height": 3 }
+          },
+
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Tempo médio de unblocking por squad — tendência",
+              "title_size": "13",
+              "show_legend": true,
+              "requests": [{
+                "formulas": [{ "formula": "query1 / 60000", "alias": "minutos" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "p50:plataforma.device.unblocking_duration_ms{env:$env,squad:$squad} by {squad}"
+                }],
+                "response_format": "timeseries",
+                "style": { "palette": "datadog16", "line_type": "solid", "line_width": "normal" }
+              }],
+              "markers": [
+                { "value": "y = 30", "display_type": "ok dashed", "label": "Meta 30min" },
+                { "value": "y = 60", "display_type": "error dashed", "label": "Limite 60min" }
+              ]
+            },
+            "layout": { "x": 8, "y": 0, "width": 4, "height": 3 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 2, "width": 12, "height": 1 }
+    },
+
+    {
+      "definition": {
+        "type": "group",
+        "layout_type": "ordered",
+        "title": "🛡️ Incidentes & Confiabilidade",
+        "background_color": "vivid_orange",
+        "widgets": [
+
+          {
+            "definition": {
+              "type": "alert_graph",
+              "title": "Status dos Monitors Críticos agora",
+              "title_size": "13",
+              "alert_id": "SUBSTITUA_PELO_ID_DO_MONITOR_ITOKEN",
+              "viz_type": "timeseries"
+            },
+            "layout": { "x": 0, "y": 0, "width": 4, "height": 3 }
+          },
+
+          {
+            "definition": {
+              "type": "event_timeline",
+              "title": "Timeline de Eventos — Incidentes e Deploys",
+              "title_size": "13",
+              "query": "tags:team:plataforma-desafiar",
+              "tags_execution": "and"
+            },
+            "layout": { "x": 4, "y": 0, "width": 8, "height": 3 }
+          },
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Monitors em ALERT agora",
+              "title_size": "13",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [{
+                "formulas": [{ "formula": "query1" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "sum:datadog.monitor.triggered{team:plataforma-desafiar,status:alert}",
+                  "aggregator": "last"
+                }],
+                "response_format": "scalar",
+                "conditional_formats": [
+                  { "comparator": ">", "value": 2, "palette": "white_on_red" },
+                  { "comparator": ">", "value": 0, "palette": "white_on_yellow" },
+                  { "comparator": "<=", "value": 0, "palette": "white_on_green" }
+                ]
+              }]
+            },
+            "layout": { "x": 0, "y": 3, "width": 2, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "MTTR médio (últimos 30 dias)",
+              "title_size": "13",
+              "autoscale": false,
+              "precision": 0,
+              "requests": [{
+                "formulas": [{ "formula": "query1 / 60", "alias": "minutos" }],
+                "queries": [{
+                  "name": "query1",
+                  "data_source": "metrics",
+                  "query": "avg:plataforma.incident.resolution_time_seconds{env:$env}",
+                  "aggregator": "avg"
+                }],
+                "response_format": "scalar",
+                "conditional_formats": [
+                  { "comparator": ">", "value": 60, "palette": "white_on_red" },
+                  { "comparator": ">", "value": 30, "palette": "white_on_yellow" },
+                  { "comparator": "<=", "value": 30, "palette": "white_on_green" }
+                ]
+              }],
+              "suffix": " min"
+            },
+            "layout": { "x": 2, "y": 3, "width": 2, "height": 2 }
+          },
+
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Incidentes P1/P2 por semana — últimos 90 dias",
+              "title_size": "13",
+              "show_legend": true,
+              "requests": [
+                {
+                  "formulas": [{ "formula": "query1", "alias": "P1 — Crítico" }],
+                  "queries": [{ "name": "query1", "data_source": "metrics", "query": "sum:plataforma.incident.count{env:$env,severity:p1}.as_count().rollup(sum, 604800)" }],
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "style": { "palette": "red" }
+                },
+                {
+                  "formulas": [{ "formula": "query2", "alias": "P2 — Alto" }],
+                  "queries": [{ "name": "query2", "data_source": "metrics", "query": "sum:plataforma.incident.count{env:$env,severity:p2}.as_count().rollup(sum, 604800)" }],
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "style": { "palette": "orange" }
+                },
+                {
+                  "formulas": [{ "formula": "query3", "alias": "Interceptados (evitados)" }],
+                  "queries": [{ "name": "query3", "data_source": "metrics", "query": "sum:plataforma.incident.intercepted{env:$env}.as_count().rollup(sum, 604800)" }],
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "style": { "palette": "green", "line_type": "dashed" }
+                }
+              ]
+            },
+            "layout": { "x": 4, "y": 3, "width": 8, "height": 2 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 3, "width": 12, "height": 1 }
+    },
+
+    {
+      "definition": {
+        "type": "note",
+        "content": "## 📌 Como usar este dashboard\n\n**Para gestores:** use o seletor de período no topo (últimos 30 dias = visão mensal). Os widgets em **vermelho** precisam de atenção imediata.\n\n**Para Tech Leads:** filtre por `squad` para ver o impacto por time. O grupo *Squads* mostra quem mais demanda e onde o unblocking está lento.\n\n**Métricas customizadas necessárias:**\n- `plataforma.device.validated` — evento de dispositivo validado\n- `plataforma.device.enabled` — evento de dispositivo habilitado\n- `plataforma.device.blocked` — gauge de dispositivos bloqueados\n- `plataforma.device.unblocking_duration_ms` — histograma do ciclo\n- `plataforma.squad.requests` — contador de solicitações por squad\n- `plataforma.incident.intercepted` — contador de incidentes evitados\n- `plataforma.incident.resolution_time_seconds` — histograma de MTTR\n\n**SLO e Monitor IDs:** substitua `SUBSTITUA_PELO_ID_DO_SEU_SLO` e `SUBSTITUA_PELO_ID_DO_MONITOR_ITOKEN` pelos IDs reais do seu ambiente.",
+        "background_color": "gray",
+        "font_size": "14",
+        "text_align": "left",
+        "vertical_align": "top",
+        "show_tick": false,
+        "tick_pos": "50%",
+        "tick_edge": "left",
+        "has_padding": true
+      },
+      "layout": { "x": 0, "y": 99, "width": 12, "height": 6 }
+    }
+  ]
+}
